@@ -1,86 +1,92 @@
-# 🔮 Julius Voice Agent — Local Stack
+# 🔮 Julius Voice Agent — Hybrid Edge-Cloud Stack
 
-O **Julius Voice Agent** é um assistente de voz conversacional inteligente, rodando de forma 100% local, offline e com custo zero. O projeto utiliza modelos abertos de inteligência artificial para detecção de fala, transcrição, raciocínio cognitivo, persistência de memórias de longo prazo e síntese de voz em tempo real.
+The **Julius Voice Agent** is an intelligent, conversational voice assistant designed for Brazilian Portuguese (pt-BR). Running as a hybrid edge-cloud modular monolith, it integrates state-of-the-art open-source AI models for voice activity detection, speech-to-text transcription, cognitive state orchestration, persistent long-term memory recall, and neural speech synthesis.
 
-Desenvolvedor: **Júlio Emanoel**  
-Idioma do Agente: **Português Brasileiro (pt-BR)**
+Developer: **Júlio Emanoel**  
+Agent Language: **Brazilian Portuguese (pt-BR)**
 
 ---
 
-## ⚙️ Arquitetura End-to-End
+## ⚙️ End-to-End Architecture
 
-O pipeline de execução de áudio opera de forma sequencial no terminal, com baixa latência e streaming de voz frase por frase:
+The audio execution pipeline operates sequentially in the terminal, boasting low-latency streaming and sentence-by-sentence voice playback:
 
 ```
-[ Microfone ] 
-      │ (Captura contínua de áudio via sounddevice a 16kHz mono)
+[ Microphone ] 
+      │ (Continuous 16kHz mono audio capture via sounddevice)
       ▼
 ┌──────────────┐
-│  Silero VAD  │ (Captura chunks de 512 amostras com pré-buffer de 0.5s)
+│  Silero VAD  │ (Scans 512-sample chunks with a 0.5s pre-speech buffer)
 └──────┬───────┘
-       │ (Dispara após 3 segundos contínuos de silêncio do usuário)
+       │ (Triggers after 3 continuous seconds of user silence)
        ▼
 ┌──────────────┐
-│ Whisper STT  │ (Transcreve o áudio offline usando faster-whisper base int8)
+│ Whisper STT  │ (Offline local transcription using faster-whisper small int8)
 └──────┬───────┘
-       │ (Texto transcrito em pt-BR)
+       │ (Transcribed pt-BR text output)
        ▼
 ┌──────────────┐
-│  Mem0 Search │ (Consulta ChromaDB local usando embeddings nomic-embed-text)
+│  Mem0 Search │ (Queries local ChromaDB using nomic-embed-text embeddings)
 └──────┬───────┘
-       │ (Injeta memórias e fatos do usuário no prompt)
+       │ (Injects retrieved user facts into the agent context)
        ▼
 ┌──────────────┐
-│  LangGraph   │ (Orquestra o diálogo do LLM usando llama3.2:3b local)
-│  (Ollama)    │ ◄───► [ Ferramentas Locais (Clima, Lembretes SQLite, Hora) ]
+│  LangGraph   │ (Orchestrates LLM dialog flow using Groq llama-3.3-70b-versatile)
+│   (Brain)    │ ◄───► [ Local Tools (Weather API, SQLite Reminders, Time) ]
 └──────┬───────┘
-       │ (Gera resposta natural sem formatação markdown)
+       │ (Generates natural response stripped of markdown/formatting)
        ▼
 ┌──────────────┐
-│ TTS Player   │ (Sintetiza áudio via Kokoro-ONNX principal ou fallback Piper)
+│ TTS Player   │ (Synthesizes speech via Kokoro-ONNX or fallback Piper voice)
 └──────┬───────┘
-       │ (Stream de áudio reproduzido frase a frase enquanto gera o texto)
+       │ (Audio playback streams sentence-by-sentence)
        ▼
-[ Alto-falante ]
+[ Speaker Output ]
 ```
+
+Detailed details about the inner data flow, routing mechanics, and sequence flows are documented in the [**ARCHITECTURE.md**](file:///c:/Users/lemos/OneDrive/Área de Trabalho/Julius Voice Agent/ARCHITECTURE.md).
 
 ---
 
-## 📁 Estrutura do Repositório (Monolito Modular)
+## 📁 Repository Structure (Modular Monolith)
 
-O projeto foi reestruturado de um layout plano para um padrão de **Monolito Modular**, agrupando responsabilidades em pacotes de alta coesão e expondo uma interface limpa:
+The codebase follows a **Modular Monolith** structure, separating responsibilities into highly cohesive modules and exposing clean programmatic interfaces:
 
 ```
 Julius Voice Agent/
-├── main.py                    # Script de entrada (loop contínuo e interface visual)
-├── requirements.txt           # Dependências do ecossistema local
-├── julius/                    # Pacote principal do agente
-│   ├── __init__.py
+├── main.py                    # Entry point (continuous audio loop & Rich CLI)
+├── requirements.txt           # Python dependency manifests
+├── .gitignore                 # Version control exclusions (ignores .env, data, venv)
+├── .env.example               # Configuration template for environment variables
+├── .env                       # Local developer secrets (not committed to Git)
+├── ARCHITECTURE.md            # In-depth architectural data flows & user journeys
+├── julius/                    # Main package folder
+│   ├── __init__.py            # Configures global warning suppressions & log levels
 │   ├── core/
 │   │   ├── __init__.py
-│   │   └── config.py          # Configurações globais (caminhos de dados e portas do Ollama)
+│   │   └── config.py          # Environment settings loader via python-dotenv
 │   ├── vad/
 │   │   ├── __init__.py
-│   │   └── detector.py        # Detector de atividade de voz (Silero VAD)
+│   │   └── detector.py        # Voice Activity Detection (Silero VAD wrapper)
 │   ├── stt/
 │   │   ├── __init__.py
-│   │   └── transcriber.py     # Transcritor local (faster-whisper)
+│   │   └── transcriber.py     # Local Speech-to-Text transcriber (faster-whisper)
 │   ├── memory/
 │   │   ├── __init__.py
-│   │   └── manager.py         # Memória persistente (Mem0 + ChromaDB)
+│   │   └── manager.py         # Long-term semantic memory manager (Mem0 + ChromaDB)
 │   ├── tts/
 │   │   ├── __init__.py
-│   │   └── player.py          # Sintetizador híbrido de fala (Kokoro/Piper)
+│   │   └── player.py          # Hybrid neural speech synthesizer (Kokoro/Piper)
 │   └── agent/
 │       ├── __init__.py
-│       ├── graph.py           # Grafo de agentes (LangGraph)
-│       └── tools/             # Ferramentas acopladas ao LLM
+│       ├── graph.py           # Dialog state machine & Groq/Ollama router (LangGraph)
+│       └── tools/             # Bound agent tools
 │           ├── __init__.py
-│           ├── search.py      # Busca web gratuita (DuckDuckGo)
-│           ├── weather.py     # Previsão climática (Open-Meteo)
-│           ├── reminder.py    # Lembretes locais (SQLite)
-│           └── current_time.py# Data e hora formatadas em pt-BR
-├── tests/                     # Suite de testes unitários do monolito
+│           ├── search.py      # DuckDuckGo web search API
+│           ├── weather.py     # Open-Meteo weather API
+│           ├── reminder.py    # SQLite-backed reminder scheduler
+│           └── current_time.py# Local system datetime query tool
+├── tests/                     # Unit testing suite
 │   ├── __init__.py
 │   ├── test_vad.py
 │   ├── test_stt.py
@@ -88,55 +94,66 @@ Julius Voice Agent/
 │   ├── test_tts.py
 │   ├── test_agent.py
 │   └── test_tools.py
-└── data/                      # Diretório de persistência de dados (gerado automaticamente)
-    ├── memory.db              # SQLite para checkpoint do LangGraph
-    ├── reminders.db           # SQLite de lembretes do usuário
-    ├── chroma_db/             # Banco vetorial local para Mem0
-    └── tts_models/            # Binários e modelos baixados para Kokoro/Piper
+└── data/                      # Persistence directory (auto-generated)
+    ├── memory.db              # SQLite storage for LangGraph thread checkpointers
+    ├── reminders.db           # SQLite database for user reminders
+    ├── chroma_db/             # Local Vector database for Mem0 embeddings
+    └── tts_models/            # Downloaded Kokoro/Piper neural model assets
 ```
 
 ---
 
-## 🛠️ Pré-requisitos & Instalação
+## 🛠️ Prerequisites & Installation
 
-### 1. Modelos Locais no Ollama
-Certifique-se de que o **Ollama** está rodando no seu computador e faça o download dos modelos necessários:
+### 1. Setup Local Models in Ollama
+Ensure **Ollama** is running locally on your machine, then pull the fallback LLM and embedding models:
 ```powershell
 ollama pull llama3.2:3b
 ollama pull nomic-embed-text
 ```
 
-### 2. Configurar o Ambiente Virtual (Python 3.11)
-Crie e ative um ambiente virtual e, em seguida, instale as dependências listadas no `requirements.txt`:
+### 2. Configure Environment Variables
+Copy `.env.example` to `.env` and fill in your credentials. To leverage the ultra-low latency response times of Julius, set your Groq API key:
 ```powershell
-# Criar ambiente virtual
+copy .env.example .env
+```
+Edit `.env`:
+```env
+USE_GROQ=True
+GROQ_API_KEY=your_actual_groq_api_key
+```
+
+### 3. Setup Virtual Environment (Python 3.11)
+Initialize and activate your virtual environment, then install dependencies:
+```powershell
+# Create virtual environment
 python -m venv venv
 
-# Ativar ambiente virtual (Windows PowerShell)
+# Activate (Windows PowerShell)
 .\venv\Scripts\activate
 
-# Instalar dependências
+# Install dependencies
 pip install -r requirements.txt
 ```
 
 ---
 
-## 🚀 Como Executar o Julius
+## 🚀 How to Run Julius
 
-1. Ative o ambiente virtual:
+1. Activate your virtual environment:
    ```powershell
    .\venv\Scripts\activate
    ```
-2. Inicie o loop principal do assistente de voz:
+2. Run the main assistant loop:
    ```powershell
    python main.py
    ```
 
-*Nota: Na primeira execução, o módulo de TTS fará o download automático dos modelos do Kokoro (`kokoro-v1.0.onnx` e `voices-v1.0.bin`) e do Piper no diretório `./data/tts_models/`.*
+*Note: On the first run, the TTS module will automatically download the required Kokoro ONNX model (`kokoro-v1.0.onnx`, `voices-v1.0.bin`) and Piper bin files to the `./data/tts_models/` folder.*
 
-### Comandos e Interação:
-- **Fale com o Agente**: Diga algo como *"Olá Julius, meu nome é Júlio"*. Espere 3 segundos de silêncio para processamento.
-- **Teste de Lembrete**: Peça *"Me lembre de comprar café amanhã às 9 horas"*.
-- **Previsão Climática**: Pergunte *"Como está o clima atual em São Paulo?"*.
-- **Memória de Longo Prazo**: Feche o programa, reabra e pergunte: *"Qual é o meu nome?"* para verificar a recuperação vetorial de fatos.
-- **Sair**: Aperte `Ctrl + C` no terminal.
+### Example Commands and Interactions:
+- **Conversation & Memory**: Say *"Olá Julius, meu nome é Júlio"*. Wait for 3 seconds of silence. Later, close the app, open it again, and ask: *"Qual é o meu nome?"* to verify persistent memory retrieval.
+- **Weather query**: Ask *"Como está o clima atual em São Paulo?"* (triggers `get_weather` tool).
+- **Time/Date query**: Ask *"Que dia é hoje?"* (triggers `get_time` tool).
+- **Reminders**: Say *"Me lembre de comprar café amanhã às 9 horas"* (triggers `set_reminder` tool).
+- **Exit**: Press `Ctrl + C` in the terminal to safely shut down the listener.
