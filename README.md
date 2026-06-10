@@ -9,40 +9,13 @@ Agent Language: **English (en)**
 
 ## ⚙️ End-to-End Architecture
 
-The audio execution pipeline operates sequentially in the terminal, boasting low-latency streaming and sentence-by-sentence voice playback:
+Julius operates as a WhatsApp-based System Design mock interviewer. The execution flow is asynchronous:
 
-```
-[ Microphone ] 
-      │ (Continuous 16kHz mono audio capture via sounddevice)
-      ▼
-┌──────────────┐
-│  Silero VAD  │ (Scans 512-sample chunks with a 0.5s pre-speech buffer)
-└──────┬───────┘
-       │ (Triggers after 3 continuous seconds of user silence)
-       ▼
-┌──────────────┐
-│ Whisper STT  │ (Offline local transcription using faster-whisper small int8)
-└──────┬───────┘
-       │ (Transcribed pt-BR text output)
-       ▼
-┌──────────────┐
-│  Mem0 Search │ (Queries local ChromaDB using nomic-embed-text embeddings)
-└──────┬───────┘
-       │ (Injects retrieved user facts into the agent context)
-       ▼
-┌──────────────┐
-│  LangGraph   │ (Orchestrates LLM dialog flow using Groq llama-3.3-70b-versatile)
-│   (Brain)    │ ◄───► [ Local Tools (Weather API, SQLite Reminders, Time) ]
-└──────┬───────┘
-       │ (Generates natural response stripped of markdown/formatting)
-       ▼
-┌──────────────┐
-│ TTS Player   │ (Synthesizes speech via Kokoro-ONNX or fallback Piper voice)
-└──────┬───────┘
-       │ (Audio playback streams sentence-by-sentence)
-       ▼
-[ Speaker Output ]
-```
+1. **User Voice Note**: The user sends a voice note (in English) to the whitelisted WhatsApp number.
+2. **FastAPI Webhook**: The incoming audio file is downloaded from the Meta Graph API.
+3. **Speech-to-Text**: Whisper transcribes the `.ogg` file locally.
+4. **Cognitive Reasoning**: LangGraph (running ChatGroq with `llama-3.3-70b-versatile`) evaluates the transcription, checks long-term memory via Mem0/ChromaDB, and executes interview-specific tools (like loading system design scenarios or saving evaluations).
+5. **WhatsApp Response**: Julius responds with a text-based follow-up message on WhatsApp.
 
 Detailed details about the inner data flow, routing mechanics, and sequence flows are documented in the [**ARCHITECTURE.md**](file:///c:/Users/lemos/OneDrive/Área de Trabalho/Julius Voice Agent/ARCHITECTURE.md).
 
@@ -142,37 +115,34 @@ pip install -r requirements.txt
 
 ---
 
-## 🚀 How to Run Julius
+## 🚀 How to Run Julius (WhatsApp Webhook Server)
 
-### Option 1: Local Terminal Voice Assistant
-1. Activate your virtual environment:
-   ```powershell
-   .\venv\Scripts\activate
-   ```
-2. Run the main assistant loop:
-   ```powershell
-   python main.py
-   ```
-   *Note: On the first run, the TTS module will automatically download the required Kokoro ONNX model (`kokoro-v1.0.onnx`, `voices-v1.0.bin`) and Piper bin files to the `./data/tts_models/` folder.*
+Julius is run as a FastAPI webhook server that handles incoming audio from the Meta WhatsApp Cloud API.
 
-#### Example Commands and Interactions:
-- **Conversation & Memory**: Say *"Hello Julius, my name is Julio"*. Wait for 3 seconds of silence. Later, close the app, open it again, and ask: *"What is my name?"* to verify persistent memory retrieval.
-- **Weather query**: Ask *"What is the weather in New York?"* (triggers `get_weather` tool).
-- **Time/Date query**: Ask *"What time is it?"* (triggers `get_time` tool).
-- **Reminders**: Say *"Remind me to buy coffee tomorrow at 9 AM"* (triggers `set_reminder` tool).
-- **Exit**: Press `Ctrl + C` in the terminal to safely shut down the listener.
+1. **Configure Environment Variables**:
+   Copy `.env.example` to `.env` and fill in your credentials:
+   - `WHATSAPP_TOKEN`: Meta access token.
+   - `WHATSAPP_PHONE_ID`: Phone number ID for test messages.
+   - `WEBHOOK_VERIFY_TOKEN`: Verification token of your choice.
+   - `MY_WHATSAPP_NUMBER`: Whitelisted phone number allowed to interact (with country code, e.g. `5581999990000`).
 
-### Option 2: WhatsApp Webhook Server (Mock System Design Interviewer)
-1. Configure the WhatsApp credentials in your `.env` file (see `.env.example`).
-2. Activate your virtual environment and start the FastAPI webhook server:
+2. **Start the Webhook Server**:
    ```powershell
    .\venv\Scripts\activate
    uvicorn whatsapp_webhook:app --reload --port 8000
    ```
-3. Expose the server to the internet using a tool like ngrok:
+
+3. **Expose the Webhook Server to the Internet**:
+   Using `ngrok` or similar:
    ```bash
    ngrok http 8000
    ```
-4. Register your callback URL (e.g. `https://xxxx.ngrok-free.app/webhook/`) and Verify Token in the Meta Developer Portal (under WhatsApp Webhooks). Subscribe to the `messages` event.
-5. Whitelist your personal number in the Sandbox "API Setup" tab.
-6. Send voice notes (in English) to your WhatsApp Business test number to practice system design interviews!
+
+4. **Meta Developer Setup**:
+   - Save your ngrok URL + `/webhook` as the webhook Callback URL in the Meta Developer Console (under WhatsApp Configuration).
+   - Enter your chosen `WEBHOOK_VERIFY_TOKEN`.
+   - Subscribe to the `messages` event.
+   - Under the Sandbox "API Setup" tab, add your personal whitelisted number.
+
+5. **Start Practicing**:
+   Record a WhatsApp voice note in English describing a system design question or answer (e.g., "What scenario should we practice today?") and send it to the sandbox business number. Julius will transcribe the audio locally and respond via text!

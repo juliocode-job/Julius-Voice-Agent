@@ -9,7 +9,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 # Import local tools and configs from the julius package
-from julius.agent.tools import search_web, get_weather, set_reminder, get_time
+from julius.agent.tools import search_web, get_time, get_system_design_scenario, save_evaluation
 from julius.core.config import (
     SQLITE_DB_PATH, LLM_MODEL, OLLAMA_BASE_URL,
     USE_GROQ, GROQ_API_KEY, GROQ_MODEL,
@@ -28,13 +28,13 @@ class AgentState(TypedDict):
 # 2. Initialize LLM based on the USE_GROQ configuration toggle
 if USE_GROQ:
     from langchain_groq import ChatGroq
-    print(f"[Agent] Inicializando ChatGroq ({GROQ_MODEL}) com nuvem de ultra-baixa latência...")
+    print(f"[Agent] Initializing ChatGroq ({GROQ_MODEL}) with ultra-low latency cloud...")
     llm = ChatGroq(model=GROQ_MODEL, temperature=0.1, groq_api_key=GROQ_API_KEY)
 else:
-    print(f"[Agent] Inicializando ChatOllama ({LLM_MODEL}) local...")
+    print(f"[Agent] Initializing ChatOllama ({LLM_MODEL}) locally...")
     llm = ChatOllama(model=LLM_MODEL, temperature=0.1, base_url=OLLAMA_BASE_URL)
 
-tools = [search_web, get_weather, set_reminder, get_time]
+tools = [search_web, get_time, get_system_design_scenario, save_evaluation]
 llm_with_tools = llm.bind_tools(tools)
 
 # 3. Define Nodes
@@ -52,17 +52,23 @@ def call_model(state: AgentState):
             if memory_ctx:
                 system_prompt += f"\n\nKnown user facts (use only if relevant):\n{memory_ctx}"
     else:
-        # System prompt optimized for audio synthesis (concise, no markdown)
-        system_prompt = f"""You are Julius, a friendly, intelligent local voice assistant speaking in English.
-Respond concisely and naturally, ideal for audio conversations (limit your responses to at most 2 or 3 short sentences).
+        # Default System prompt for mock System Design Interviewer
+        system_prompt = f"""You are Julius, a professional, encouraging, and analytical System Design Interviewer speaking in English.
+Your goal is to conduct a mock system design interview. 
+
+INTERVIEW STRUCTURE & GUIDELINES:
+1. Start by asking the candidate to choose a topic or introduce a scenario using the `get_system_design_scenario` tool.
+2. Guide the candidate through requirements gathering, high-level design, deep dives, and scaling constraints.
+3. Be supportive but rigorous. Do not give away the solution immediately. Ask open-ended questions.
+4. Keep your responses concise (limit to 2 or 3 sentences maximum) since the candidate is listening/reading asynchronously.
+5. Do not use any markdown formatting (like lists, bold, italics, or hashtags) in your responses so that they are easily readable in any UI.
+6. When the candidate completes the mock session, evaluate their performance and save the feedback using the `save_evaluation` tool.
 
 TOOL USAGE RULES:
-1. If the user asks for the time, date, or day of the week, call the `get_time` tool. NEVER search the web for this.
-2. Answer the user directly using data returned by the tools in the recent history (like time/date from `get_time` or weather from `get_weather`).
-3. For weather/temperature queries, call the `get_weather` tool.
-4. For searching news, recent events, historical facts, or general web queries, call the `search_web` tool.
-5. To schedule, create, or save reminders, call the `set_reminder` tool.
-6. IMPORTANT: Do not use any markdown formatting (like lists, bullet points, bold, italic, or hashtags) in your responses, as they will be spoken directly. Speak sequentially in a single sentence if listing items.
+1. If the candidate wants to get requirements for a specific system design scenario, call the `get_system_design_scenario` tool.
+2. If the user asks for the current date or time, call the `get_time` tool.
+3. If you need to search the web for technical specifications, reference architectures, or documentation, call the `search_web` tool.
+4. When the interview ends, summarize the candidate's strengths and areas of improvement, and save it using the `save_evaluation` tool.
 
 Known user facts from long-term memory (use only if relevant):
 {memory_ctx if memory_ctx else "None."}
@@ -86,8 +92,8 @@ Known user facts from long-term memory (use only if relevant):
             else:
                 system_prompt_synthesis += "\n\nYour task is to answer the user's question directly using the information provided by the tools in the recent message history. Do not use any markdown formatting in your response."
         else:
-            system_prompt_synthesis = f"""You are Julius, a friendly and intelligent voice assistant speaking in English.
-Respond concisely and naturally (maximum 2 to 3 short sentences), ideal for voice. Never use markdown formatting.
+            system_prompt_synthesis = f"""You are Julius, a professional and friendly System Design Interviewer speaking in English.
+Respond concisely and naturally (maximum 2 to 3 sentences), ideal for messaging. Never use markdown formatting.
 Your task is to answer the user's question directly using the information provided by the tools in the recent message history.
 
 Known user facts from long-term memory (use only if relevant):
@@ -102,11 +108,11 @@ Known user facts from long-term memory (use only if relevant):
             elif isinstance(m, AIMessage) or getattr(m, "type", "") == "ai":
                 if getattr(m, "tool_calls", []):
                     calls_str = ", ".join([f"{c['name']}({c['args']})" for c in m.tool_calls])
-                    synthesis_messages.append(AIMessage(content=f"[Executando: {calls_str}]"))
+                    synthesis_messages.append(AIMessage(content=f"[Executing: {calls_str}]"))
                 else:
                     synthesis_messages.append(m)
             elif isinstance(m, ToolMessage) or getattr(m, "type", "") == "tool":
-                synthesis_messages.append(HumanMessage(content=f"[Resultado da ferramenta: {m.content}]"))
+                synthesis_messages.append(HumanMessage(content=f"[Tool result: {m.content}]"))
             else:
                 synthesis_messages.append(m)
                 
@@ -116,7 +122,7 @@ Known user facts from long-term memory (use only if relevant):
         
     tool_calls = getattr(response, "tool_calls", [])
     
-    # Se o modelo gerou um JSON bruto no content descrevendo uma chamada de ferramenta, mas o LangChain não o parseou
+    # Check if the model generated raw JSON in the content describing a tool call that LangChain failed to parse
     if not tool_calls and response.content:
         import json
         content_stripped = response.content.strip()
@@ -128,7 +134,6 @@ Known user facts from long-term memory (use only if relevant):
         
         if content_stripped.startswith("{") and content_stripped.endswith("}"):
             try:
-                # Corrige caracteres de escape inválidos que quebram o parser JSON standard
                 cleaned_content = content_stripped.replace("\\|", "|")
                 data = json.loads(cleaned_content)
                 if "name" in data:
@@ -137,7 +142,7 @@ Known user facts from long-term memory (use only if relevant):
                         "args": data.get("parameters") or data.get("arguments") or {},
                         "id": f"call_{data['name']}",
                         "type": "tool_call"
-                    }]
+                     }]
                     response.tool_calls = tool_calls
             except Exception:
                 pass
@@ -186,6 +191,6 @@ db_conn = sqlite3.connect(SQLITE_DB_PATH, check_same_thread=False)
 checkpointer = SqliteSaver(db_conn)
 
 # Compile Graph
-print("[Agent] Compilando grafo LangGraph com persistência SQLite local...")
+print("[Agent] Compiling LangGraph with local SQLite persistence...")
 agent_graph = workflow.compile(checkpointer=checkpointer)
-print("[Agent] Grafo de diálogo compilado com sucesso!")
+print("[Agent] Dialog graph successfully compiled!")
