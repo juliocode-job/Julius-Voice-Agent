@@ -1,6 +1,6 @@
 # Julius Voice Agent — System Architecture
 
-This document describes the end-to-end architecture, user journey, data flow, and core technical features of the **Julius Voice Agent**, a low-latency, modular voice assistant designed for Brazilian Portuguese (pt-BR).
+This document describes the end-to-end architecture, user journey, data flow, and core technical features of the **Julius Voice Agent**, a low-latency, modular voice assistant designed in English.
 
 ---
 
@@ -9,14 +9,14 @@ This document describes the end-to-end architecture, user journey, data flow, an
 Julius is built with a hybrid edge-cloud stack designed for **zero cost, low latency, offline autonomy, and long-term memory recollection**:
 
 - **Voice Activity Detection (VAD)**: Powering seamless hands-free conversational triggers using *Silero VAD* (running locally on CPU). It tracks sound blocks, saves pre-speech buffer context, and fires after a configured 3-second silence threshold.
-- **Speech-To-Text (STT)**: Offline local transcription using `faster-whisper` (`small` model quantized to `int8` CPU execution) optimized for low latency and high accuracy in Portuguese.
+- **Speech-To-Text (STT)**: Offline local transcription using `faster-whisper` (`small` model quantized to `int8` CPU execution) optimized for low latency and high accuracy in English.
 - **Cognitive Reasoning (LangGraph & Groq)**: 
   - Dialog flow managed by `LangGraph` with localized `SQLite` checkpointer state persistence.
   - Hybrid model routing: Uses **Groq Cloud** with `llama-3.3-70b-versatile` (latencies ~600ms) for high-intelligence tool calling and synthesis, with a fallback toggle to local **Ollama** (`llama3.2:3b`).
   - Separated execution prompts: *Routing System Prompt* (first pass for tool routing) and *Synthesis System Prompt* (second pass for natural conversation formatting, ignoring markdown and tools).
   - Role conversion layer: Restructures message schemas sent to Groq during the synthesis pass, mapping tool responses into human-structured messages to prevent API errors.
 - **Long-term Memory (Mem0 + ChromaDB)**: Dynamic facts extraction and retrieval via local `Mem0` vector storage, utilizing local `nomic-embed-text` embeddings through Ollama.
-- **Text-To-Speech (TTS)**: Hybrid architecture featuring `Kokoro-ONNX` (high-fidelity neural voice) with a subprocess fallback to `Piper` (high-speed local voice generation).
+- **Text-To-Speech (TTS)**: Hybrid architecture featuring `Kokoro-ONNX` (high-fidelity neural voice) with a subprocess fallback to `Piper` (high-speed local voice generation in English).
 - **Extensible Agent Tools**:
   - `get_time`: Direct local system datetime query (avoids web search hallucination).
   - `get_weather`: Open-source weather metrics fetching.
@@ -65,6 +65,23 @@ graph TD
     P --> Q["Saved User Facts database"]
 ```
 
+### 📱 WhatsApp Webhook Architecture & Data Flow
+
+For the WhatsApp channel, the physical VAD, microphone, and speaker audio layers are bypassed. The flow operates as follows:
+
+```mermaid
+graph TD
+    UserPhone["User WhatsApp Voice Note (.ogg)"] --> Webhook["FastAPI Server (whatsapp_webhook.py)"]
+    Webhook -- "Download Request" --> MetaAPI["Meta Graph API"]
+    MetaAPI -- "Audio Binary" --> Webhook
+    Webhook --> STT["stt/transcriber.py (Whisper small int8)"]
+    STT -- "English Transcription" --> MemorySearch["Memory Retrieval (Mem0)"]
+    MemorySearch --> LangGraph["LangGraph Dialog State (agent/graph.py)"]
+    LangGraph ◄───► Tools["Agent Tools"]
+    LangGraph -- "Synthesized Text Reply" --> MetaSend["Meta Send API"]
+    MetaSend --> UserPhone
+```
+
 ---
 
 ## 🗺️ User Journey Map
@@ -83,25 +100,25 @@ sequenceDiagram
     participant TTS as "TTS (Kokoro/Piper)"
 
 
-    User->>VAD: Speak: "Que horas são?"
+    User->>VAD: Speak: "What time is it?"
     Note over VAD: Capturing audio buffer...
     Note over VAD: Silence threshold reached (3s)
     VAD->>STT: Send raw audio utterance
     STT->>STT: Transcribe audio to text
     STT->>Mem: Query memory for transcription context
-    Mem-->>STT: Return relevant memories ("User resides in São Paulo", etc.)
+    Mem-->>STT: Return relevant memories ("User resides in New York", etc.)
     STT->>Graph: Send Transcription + Memory Context
     
     rect rgb(240, 248, 255)
         Note over Graph: Routing Phase
         Graph->>Graph: Evaluate prompts & conversation history
         Graph-->>Tools: Trigger tool call: get_time()
-        Tools-->>Graph: Return payload: "Quinta-feira, 4 de Junho de 2026 às 13:41"
+        Tools-->>Graph: Return payload: "Thursday, June 4, 2026 at 13:41"
         Note over Graph: Role-Conversion & Synthesis Phase
         Note over Graph: Remove markdown, format text for voice
     end
     
-    Graph->>TTS: Send synthesized response: "São 13h41..."
+    Graph->>TTS: Send synthesized response: "It is 1:41 PM..."
     Note over TTS: Stop microphone listener stream (prevent feedback echo)
     TTS->>User: Play synthesized voice audio
     Note over TTS: Restart microphone listener stream

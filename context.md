@@ -92,17 +92,40 @@ Nesta sessão, focamos em migrar o raciocínio cognitivo para a nuvem de ultra-b
 
 ---
 
+## 📅 Sessão: Integração com WhatsApp e Pivô para Inglês (09 de Junho de 2026)
+
+### 1. Canal de Comunicação do WhatsApp (FastAPI + Webhook)
+*   **Problema**: Integrar o agente de voz Julius de forma assíncrona ao WhatsApp para simular entrevistas de System Design.
+*   **Resolução**:
+    - Criamos a estrutura de pacotes `julius/whatsapp/` e implementamos o adaptador `adapter.py` para coordenar o download de mídia (mensagens de voz .ogg do Meta API), transcrição local em thread pools e execução assíncrona do grafo LangGraph.
+    - Criamos o endpoint de Webhook FastAPI `whatsapp_webhook.py` com rotas para validação do Meta (GET) e processamento assíncrono seguro (POST) protegido por whitelist de número de telefone (`MY_WHATSAPP_NUMBER`).
+    - Para segurança e performance, envolvemos todas as chamadas síncronas/bloqueantes pesadas de STT e do LangGraph em executors usando `asyncio.to_thread`.
+
+### 2. Pivô Completo do Idioma para Inglês (English Language Pivot)
+*   **Problema**: Tanto os áudios recebidos pelo WhatsApp/Microfone quanto as respostas do Julius precisavam ser exclusivamente em inglês para treinar entrevistas.
+*   **Resolução**:
+    - Atualizamos o idioma forçado de transcrição do Whisper de `"pt"` para `"en"` no `transcriber.py`.
+    - Traduzimos todos os prompts de fallback (Roteamento e Síntese de Ferramentas) no `graph.py` para inglês e removemos quaisquer referências a "português brasileiro".
+    - Atualizamos o player de TTS (`player.py`) para baixar o modelo de áudio do Piper em inglês (`en_US-lessac-medium.onnx`) e configuramos o Kokoro com a voz americana padrão (`af_sarah` e `lang="en-us"`).
+    - Traduzimos a interface do terminal CLI de `main.py` e os retornos da ferramenta `get_time` em `current_time.py` para inglês de ponta a ponta.
+
+---
+
 ## 📌 Ponto de Parada Atual (Onde Paramos)
 
-
-- **VAD, STT, TTS e Memória**: Todos os subsistemas locais funcionam de forma rápida e silenciosa.
-- **Interface da CLI**: Extremamente limpa. Mostra apenas os painéis estilizados de conversa (Você e Julius) e o status temporário de pensamento do agente.
-- **Cognitivo (Groq Cloud)**: O grafo do LangGraph executa com `llama-3.3-70b-versatile` e responde de forma limpa e direta.
+- **Canais**: Julius agora suporta dupla entrada (Loop local via microfone em `main.py` e servidor de webhook assíncrono via `whatsapp_webhook.py`).
+- **Idioma**: Todas as operações são 100% nativas em inglês.
+- **Integração WhatsApp**: Pronto para teste em ambiente de produção (Meta Developer Portal).
+- **Testes Automatizados**: A suite de testes no scratch `test_whatsapp_integration.py` e unitária de `test_agent.py` rodam e passam com sucesso.
 
 ### Como Rodar no Próximo Chat:
-1. Ative o ambiente virtual e execute:
+1. Para o loop de voz CLI local:
    ```powershell
    .\venv\Scripts\activate
    python main.py
    ```
-2. Fale em português. A interação exibirá apenas os balões de conversa no terminal.
+2. Para o canal do WhatsApp Webhook:
+   ```powershell
+   .\venv\Scripts\activate
+   uvicorn whatsapp_webhook:app --reload --port 8000
+   ```

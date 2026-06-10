@@ -1,9 +1,9 @@
 # 🔮 Julius Voice Agent — Hybrid Edge-Cloud Stack
 
-The **Julius Voice Agent** is an intelligent, conversational voice assistant designed for Brazilian Portuguese (pt-BR). Running as a hybrid edge-cloud modular monolith, it integrates state-of-the-art open-source AI models for voice activity detection, speech-to-text transcription, cognitive state orchestration, persistent long-term memory recall, and neural speech synthesis.
+The **Julius Voice Agent** is an intelligent, conversational voice assistant designed in English. Operating as a hybrid edge-cloud modular monolith, it integrates state-of-the-art open-source AI models for voice activity detection, speech-to-text transcription, cognitive state orchestration, persistent long-term memory recall, neural speech synthesis, and an asynchronous WhatsApp interface for mock system design interviews.
 
 Developer: **Júlio Emanoel**  
-Agent Language: **Brazilian Portuguese (pt-BR)**
+Agent Language: **English (en)**
 
 ---
 
@@ -55,6 +55,7 @@ The codebase follows a **Modular Monolith** structure, separating responsibiliti
 ```
 Julius Voice Agent/
 ├── main.py                    # Entry point (continuous audio loop & Rich CLI)
+├── whatsapp_webhook.py        # FastAPI server webhook for WhatsApp Cloud API channel
 ├── requirements.txt           # Python dependency manifests
 ├── .gitignore                 # Version control exclusions (ignores .env, data, venv)
 ├── .env.example               # Configuration template for environment variables
@@ -77,6 +78,9 @@ Julius Voice Agent/
 │   ├── tts/
 │   │   ├── __init__.py
 │   │   └── player.py          # Hybrid neural speech synthesizer (Kokoro/Piper)
+│   ├── whatsapp/
+│   │   ├── __init__.py        # WhatsApp sub-package init
+│   │   └── adapter.py         # Media downloader, STT transcriber, and agent router
 │   └── agent/
 │       ├── __init__.py
 │       ├── graph.py           # Dialog state machine & Groq/Ollama router (LangGraph)
@@ -140,6 +144,7 @@ pip install -r requirements.txt
 
 ## 🚀 How to Run Julius
 
+### Option 1: Local Terminal Voice Assistant
 1. Activate your virtual environment:
    ```powershell
    .\venv\Scripts\activate
@@ -148,12 +153,26 @@ pip install -r requirements.txt
    ```powershell
    python main.py
    ```
+   *Note: On the first run, the TTS module will automatically download the required Kokoro ONNX model (`kokoro-v1.0.onnx`, `voices-v1.0.bin`) and Piper bin files to the `./data/tts_models/` folder.*
 
-*Note: On the first run, the TTS module will automatically download the required Kokoro ONNX model (`kokoro-v1.0.onnx`, `voices-v1.0.bin`) and Piper bin files to the `./data/tts_models/` folder.*
-
-### Example Commands and Interactions:
-- **Conversation & Memory**: Say *"Olá Julius, meu nome é Júlio"*. Wait for 3 seconds of silence. Later, close the app, open it again, and ask: *"Qual é o meu nome?"* to verify persistent memory retrieval.
-- **Weather query**: Ask *"Como está o clima atual em São Paulo?"* (triggers `get_weather` tool).
-- **Time/Date query**: Ask *"Que dia é hoje?"* (triggers `get_time` tool).
-- **Reminders**: Say *"Me lembre de comprar café amanhã às 9 horas"* (triggers `set_reminder` tool).
+#### Example Commands and Interactions:
+- **Conversation & Memory**: Say *"Hello Julius, my name is Julio"*. Wait for 3 seconds of silence. Later, close the app, open it again, and ask: *"What is my name?"* to verify persistent memory retrieval.
+- **Weather query**: Ask *"What is the weather in New York?"* (triggers `get_weather` tool).
+- **Time/Date query**: Ask *"What time is it?"* (triggers `get_time` tool).
+- **Reminders**: Say *"Remind me to buy coffee tomorrow at 9 AM"* (triggers `set_reminder` tool).
 - **Exit**: Press `Ctrl + C` in the terminal to safely shut down the listener.
+
+### Option 2: WhatsApp Webhook Server (Mock System Design Interviewer)
+1. Configure the WhatsApp credentials in your `.env` file (see `.env.example`).
+2. Activate your virtual environment and start the FastAPI webhook server:
+   ```powershell
+   .\venv\Scripts\activate
+   uvicorn whatsapp_webhook:app --reload --port 8000
+   ```
+3. Expose the server to the internet using a tool like ngrok:
+   ```bash
+   ngrok http 8000
+   ```
+4. Register your callback URL (e.g. `https://xxxx.ngrok-free.app/webhook/`) and Verify Token in the Meta Developer Portal (under WhatsApp Webhooks). Subscribe to the `messages` event.
+5. Whitelist your personal number in the Sandbox "API Setup" tab.
+6. Send voice notes (in English) to your WhatsApp Business test number to practice system design interviews!
