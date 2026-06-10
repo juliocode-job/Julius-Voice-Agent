@@ -59,17 +59,17 @@ def setup_piper():
         except Exception:
             pass
             
-    # Download Portuguese voice model and config
+    # Download English voice model and config
     download_file(
-        "https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx",
-        os.path.join(TTS_MODELS_DIR, "pt_BR-faber-medium.onnx")
+        "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
+        os.path.join(TTS_MODELS_DIR, "en_US-lessac-medium.onnx")
     )
     download_file(
-        "https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx.json",
-        os.path.join(TTS_MODELS_DIR, "pt_BR-faber-medium.onnx.json")
+        "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
+        os.path.join(TTS_MODELS_DIR, "en_US-lessac-medium.onnx.json")
     )
     
-    return piper_exe, os.path.join(TTS_MODELS_DIR, "pt_BR-faber-medium.onnx")
+    return piper_exe, os.path.join(TTS_MODELS_DIR, "en_US-lessac-medium.onnx")
 
 def setup_kokoro():
     onnx_path = os.path.join(TTS_MODELS_DIR, "kokoro-v1.0.onnx")
@@ -120,9 +120,9 @@ class KokoroPlayer:
     def play(self, text: str):
         samples, sample_rate = self.kokoro.create(
             text,
-            voice="pf_dora",
+            voice="af_sarah",
             speed=1.0,
-            lang="pt-br"
+            lang="en-us"
         )
         sd.play(samples, sample_rate)
         sd.wait()

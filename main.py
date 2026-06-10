@@ -54,8 +54,8 @@ def main():
     console.clear()
     console.print(Panel.fit(
         "[bold purple]🔮 JULIUS VOICE AGENT — LOCAL STACK[/bold purple]\n"
-        "[bold white]Desenvolvedor: Júlio Emanoel[/bold white]\n"
-        "Status: [green]Inicializando componentes locais...[/green]\n"
+        "[bold white]Developer: Júlio Emanoel[/bold white]\n"
+        "Status: [green]Initializing local components...[/green]\n"
         "Stack: VAD (Silero) | STT (Whisper) | LLM (Ollama) | Memory (Mem0) | TTS (Kokoro/Piper)",
         border_style="purple"
     ))
@@ -66,7 +66,7 @@ def main():
         stt = STTTranscriber()
         tts = TTSPlayer()
     except Exception as e:
-        console.print(f"[bold red]Erro crítico na inicialização dos componentes: {e}[/bold red]")
+        console.print(f"[bold red]Critical error during component initialization: {e}[/bold red]")
         sys.exit(1)
 
     audio_queue = queue.Queue()
@@ -85,11 +85,11 @@ def main():
     )
 
     console.print(Panel(
-        "[bold green]Julius está online e pronto para ouvir![/bold green]\n"
-        "Fale livremente em português brasileiro (pt-BR).\n"
-        "O detector de voz processará sua fala após 3 segundos de silêncio.\n"
-        "Pressione [bold red]Ctrl + C[/bold red] para encerrar a sessão.",
-        title="[bold green]SISTEMA ONLINE[/bold green]",
+        "[bold green]Julius is online and ready to listen![/bold green]\n"
+        "Speak freely in English.\n"
+        "The voice detector will process your speech after 3 seconds of silence.\n"
+        "Press [bold red]Ctrl + C[/bold red] to end the session.",
+        title="[bold green]SYSTEM ONLINE[/bold green]",
         border_style="green"
     ))
 
@@ -110,34 +110,34 @@ def main():
                         # VAD triggered a complete utterance
                         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         
-                        console.print("\n[bold yellow]🎤 Processando áudio capturado...[/bold yellow]")
+                        console.print("\n[bold yellow]🎤 Processing captured audio...[/bold yellow]")
                         
                         # 1. Speech-To-Text transcription
                         transcription = stt.transcribe(utterance)
                         if not transcription.strip():
-                            console.print("[dim yellow]🔇 Áudio recebido, mas nenhuma fala clara foi compreendida.[/dim yellow]")
+                            console.print("[dim yellow]🔇 Audio received, but no clear speech was understood.[/dim yellow]")
                             continue
 
                         console.print(Panel(
                             f"[bold white]{transcription}[/bold white]",
-                            title="[bold cyan]Você[/bold cyan]",
+                            title="[bold cyan]You[/bold cyan]",
                             border_style="cyan"
                         ))
 
                         # 2. Long-term Memory Retrieval
-                        console.print("[dim]🧠 Consultando memórias de longo prazo (Mem0)...[/dim]")
+                        console.print("[dim]🧠 Querying long-term memory (Mem0)...[/dim]")
                         memories = search_memory(transcription)
                         memory_context = "\n".join(memories) if memories else ""
                         if memories:
-                            console.print(f"[dim green]📚 Memórias recuperadas: {len(memories)}[/dim green]")
+                            console.print(f"[dim green]📚 Memories retrieved: {len(memories)}[/dim green]")
                             for m in memories:
                                 console.print(f"  - {m}")
                         else:
-                            console.print("[dim]📚 Nenhuma memória relevante encontrada.[/dim]")
+                            console.print("[dim]📚 No relevant memories found.[/dim]")
 
 
                         # 3. Invoke LangGraph Agent workflow
-                        with Status("[bold yellow]🧠 Julius está pensando...[/bold yellow]", spinner="dots") as status:
+                        with Status("[bold yellow]🧠 Julius is thinking...[/bold yellow]", spinner="dots") as status:
                             config = {
                                 "configurable": {"thread_id": "main_session"},
                                 "recursion_limit": 5
@@ -152,7 +152,7 @@ def main():
                             final_response = result["messages"][-1].content
 
                         # 4. Stream TTS response sentence-by-sentence
-                        console.print("[bold green]🔊 Falando...[/bold green]")
+                        console.print("[bold green]🔊 Speaking...[/bold green]")
                         # Stop input stream to prevent feedback/echo from the speakers
                         stream.stop()
                         
@@ -184,10 +184,10 @@ def main():
                         stream.start()
 
                 except Exception as e:
-                    console.print(f"[bold red]Ocorreu um erro ao processar a resposta: {e}[/bold red]")
+                    console.print(f"[bold red]An error occurred while processing response: {e}[/bold red]")
                     continue
     except KeyboardInterrupt:
-        console.print("\n[bold red]Encerrando o Julius Voice Agent. Até logo![/bold red]")
+        console.print("\n[bold red]Ending Julius Voice Agent session. Goodbye![/bold red]")
 
 if __name__ == "__main__":
     main()

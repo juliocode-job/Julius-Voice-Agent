@@ -14,7 +14,7 @@ class STTTranscriber:
     def transcribe(self, audio_data: np.ndarray) -> str:
         """
         Transcribes a float32 numpy array of audio (16kHz sample rate).
-        Forces Brazilian Portuguese language.
+        Forces English language.
         Returns the transcription text.
         """
         if len(audio_data) == 0:
@@ -22,7 +22,7 @@ class STTTranscriber:
             
         segments, info = self.model.transcribe(
             audio_data, 
-            language="pt", 
+            language="en", 
             beam_size=1,
             temperature=0.0
         )
@@ -32,3 +32,19 @@ class STTTranscriber:
             text += segment.text
             
         return text.strip()
+
+    def transcribe_file(self, audio_path: str, language: str = "en") -> str:
+        """
+        Transcribes an audio file (ogg, mp3, m4a, wav, etc.) from disk.
+        Used by the WhatsApp channel where audio arrives as a downloaded file
+        instead of a live numpy array from sounddevice.
+        """
+        segments, info = self.model.transcribe(
+            audio_path,
+            language=language,
+            beam_size=5,
+            vad_filter=True,       # removes silence segments automatically
+            vad_parameters=dict(min_silence_duration_ms=300)
+        )
+        transcript = " ".join([seg.text for seg in segments]).strip()
+        return transcript

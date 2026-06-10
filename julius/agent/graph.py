@@ -12,7 +12,8 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from julius.agent.tools import search_web, get_weather, set_reminder, get_time
 from julius.core.config import (
     SQLITE_DB_PATH, LLM_MODEL, OLLAMA_BASE_URL,
-    USE_GROQ, GROQ_API_KEY, GROQ_MODEL
+    USE_GROQ, GROQ_API_KEY, GROQ_MODEL,
+    AGENT_SYSTEM_PROMPT, AGENT_LANGUAGE
 )
 
 # Ensure data directory exists
@@ -43,20 +44,28 @@ def call_model(state: AgentState):
     """
     memory_ctx = state.get("memory_context", "")
     
-    # System prompt optimized for audio synthesis (concise, no markdown)
-    system_prompt = f"""Você é o Julius, um agente de voz local, amigável e inteligente em português brasileiro (pt-BR).
-Responda de forma concisa e natural, ideal para conversas de áudio (limite suas respostas a no máximo 2 ou 3 frases curtas).
+    if AGENT_SYSTEM_PROMPT:
+        system_prompt = AGENT_SYSTEM_PROMPT
+        if "{memory_context}" in system_prompt:
+            system_prompt = system_prompt.replace("{memory_context}", memory_ctx or "None.")
+        else:
+            if memory_ctx:
+                system_prompt += f"\n\nKnown user facts (use only if relevant):\n{memory_ctx}"
+    else:
+        # System prompt optimized for audio synthesis (concise, no markdown)
+        system_prompt = f"""You are Julius, a friendly, intelligent local voice assistant speaking in English.
+Respond concisely and naturally, ideal for audio conversations (limit your responses to at most 2 or 3 short sentences).
 
-REGRAS DE USO DE FERRAMENTAS:
-1. Se o usuário perguntar as horas, que horas são, a data, que dia é hoje ou o dia da semana, chame a ferramenta `get_time`. NUNCA use a pesquisa na web para isso.
-2. Responda diretamente ao usuário usando os dados retornados pelas ferramentas no histórico recente (como a data/hora de `get_time` ou o clima de `get_weather`).
-3. Para previsão do tempo, clima ou temperatura de qualquer cidade ou localidade, chame a ferramenta `get_weather`.
-4. Para pesquisar notícias, eventos recentes, fatos históricos ou dúvidas gerais na internet, chame a ferramenta `search_web`.
-5. Para agendar, criar ou salvar lembretes ou compromissos, chame a ferramenta `set_reminder`.
-6. IMPORTANTE: Não use nenhuma formatação markdown (como listas com bullet points, negrito, itálico ou hashtags) nas suas respostas, pois elas serão faladas diretamente por voz. Se precisar citar itens, fale-os de forma corrida em uma frase contínua.
+TOOL USAGE RULES:
+1. If the user asks for the time, date, or day of the week, call the `get_time` tool. NEVER search the web for this.
+2. Answer the user directly using data returned by the tools in the recent history (like time/date from `get_time` or weather from `get_weather`).
+3. For weather/temperature queries, call the `get_weather` tool.
+4. For searching news, recent events, historical facts, or general web queries, call the `search_web` tool.
+5. To schedule, create, or save reminders, call the `set_reminder` tool.
+6. IMPORTANT: Do not use any markdown formatting (like lists, bullet points, bold, italic, or hashtags) in your responses, as they will be spoken directly. Speak sequentially in a single sentence if listing items.
 
-Fatos sobre o usuário da memória de longo prazo (use somente se forem relevantes para a resposta):
-{memory_ctx if memory_ctx else "Nenhum fato relevante conhecido."}
+Known user facts from long-term memory (use only if relevant):
+{memory_ctx if memory_ctx else "None."}
 """
     
     recent_messages = state["messages"][-20:]
@@ -64,12 +73,25 @@ Fatos sobre o usuário da memória de longo prazo (use somente se forem relevant
     
     last_msg = messages[-1] if messages else None
     if last_msg and (isinstance(last_msg, ToolMessage) or getattr(last_msg, "type", "") == "tool"):
-        system_prompt_synthesis = f"""Você é o Julius, um assistente de voz amigável e inteligente em português brasileiro (pt-BR).
-Responda sempre de forma concisa e natural (máximo 2 a 3 frases curtas), ideal para voz. Nunca use formatação markdown (como hashtags, listas ou negrito).
-Sua tarefa é responder diretamente à pergunta do usuário usando as informações fornecidas pelas ferramentas no histórico recente de mensagens.
+        if AGENT_SYSTEM_PROMPT:
+            system_prompt_synthesis = AGENT_SYSTEM_PROMPT
+            if "{memory_context}" in system_prompt_synthesis:
+                system_prompt_synthesis = system_prompt_synthesis.replace("{memory_context}", memory_ctx or "None.")
+            else:
+                if memory_ctx:
+                    system_prompt_synthesis += f"\n\nKnown user facts (use only if relevant):\n{memory_ctx}"
+            
+            if AGENT_LANGUAGE == "pt":
+                system_prompt_synthesis += "\n\nSua tarefa é responder diretamente à pergunta do usuário usando as informações fornecidas pelas ferramentas no histórico recente de mensagens. Não use nenhuma formatação markdown na sua resposta."
+            else:
+                system_prompt_synthesis += "\n\nYour task is to answer the user's question directly using the information provided by the tools in the recent message history. Do not use any markdown formatting in your response."
+        else:
+            system_prompt_synthesis = f"""You are Julius, a friendly and intelligent voice assistant speaking in English.
+Respond concisely and naturally (maximum 2 to 3 short sentences), ideal for voice. Never use markdown formatting.
+Your task is to answer the user's question directly using the information provided by the tools in the recent message history.
 
-Fatos sobre o usuário da memória de longo prazo (use somente se forem relevantes para a resposta):
-{memory_ctx if memory_ctx else "Nenhum fato relevante conhecido."}
+Known user facts from long-term memory (use only if relevant):
+{memory_ctx if memory_ctx else "None."}
 """
         synthesis_messages = []
         for m in messages:

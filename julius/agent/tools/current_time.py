@@ -4,18 +4,13 @@ from langchain_core.tools import tool
 @tool
 def get_time(**kwargs) -> str:
     """
-    Retorna o dia da semana, a data e o horário atual formatados em português (pt-BR).
-    Use sempre que o usuário perguntar as horas, que horas são, a data, que dia é hoje, o dia da semana ou qualquer dúvida relacionada ao horário atual.
+    Returns the current day of the week, date, and time formatted in English.
+    Always use this when the user asks for the time, date, day of the week, or current time.
     """
     now = datetime.now()
-    dias = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
-    meses = [
-        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ]
-    dia_semana = dias[now.weekday()]
+    dia_semana = now.strftime("%A")
     dia = now.day
-    mes = meses[now.month - 1]
+    mes = now.strftime("%B")
     ano = now.year
     hora = now.strftime("%H:%M")
-    return f"{dia_semana}, {dia} de {mes} de {ano} às {hora}"
+    return f"{dia_semana}, {mes} {dia}, {ano} at {hora}"

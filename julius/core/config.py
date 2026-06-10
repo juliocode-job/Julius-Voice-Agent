@@ -30,3 +30,18 @@ if USE_GROQ and not GROQ_API_KEY:
         UserWarning
     )
 
+# WhatsApp Cloud API Configuration
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
+WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", "")
+WEBHOOK_VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN", "changeme")
+MY_WHATSAPP_NUMBER = os.getenv("MY_WHATSAPP_NUMBER", "")
+AGENT_LANGUAGE = os.getenv("AGENT_LANGUAGE", "en")
+
+# Agent prompt configuration
+import pathlib
+_prompt_path_str = os.getenv("AGENT_PROMPT_FILE", os.path.join(BASE_DIR, "prompts", "interviewer_prompt.txt"))
+if not os.path.isabs(_prompt_path_str):
+    _prompt_path_str = os.path.join(BASE_DIR, _prompt_path_str)
+_prompt_file = pathlib.Path(_prompt_path_str)
+AGENT_SYSTEM_PROMPT = _prompt_file.read_text(encoding="utf-8") if _prompt_file.exists() else ""
+
