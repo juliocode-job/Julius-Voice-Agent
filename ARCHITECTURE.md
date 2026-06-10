@@ -13,6 +13,7 @@ Julius is built with a modular, cloud-connected architecture designed for **low 
 - **Cognitive Reasoning (LangGraph & Groq)**: 
   - Dialog flow managed by `LangGraph` with localized `SQLite` checkpointer state persistence.
   - Hybrid model routing: Uses **Groq Cloud** with `llama-3.3-70b-versatile` (latencies ~600ms) for high-intelligence tool calling and synthesis, with a fallback toggle to local **Ollama** (`llama3.2:3b`).
+  - **GenAI System Design Interviewer Prompt**: Configured via a comprehensive 6-step interview workflow (opening, framing, high-level design, deep dive, incident round, and structured rubrics) loaded dynamically from `prompts/interviewer_prompt.txt`.
   - Separated execution prompts: *Routing System Prompt* (first pass for tool routing) and *Synthesis System Prompt* (second pass for natural conversation formatting, ignoring markdown and tools).
   - Role conversion layer: Restructures message schemas sent to Groq during the synthesis pass, mapping tool responses into human-structured messages to prevent API errors.
 - **Long-term Memory (Mem0 + ChromaDB)**: Dynamic facts extraction and retrieval via local `Mem0` vector storage, utilizing local `nomic-embed-text` embeddings through Ollama.

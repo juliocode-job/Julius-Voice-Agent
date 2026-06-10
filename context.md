@@ -76,6 +76,23 @@ Atualizamos o idioma de transcrição e prompts de raciocínio no LangGraph para
 
 ---
 
+## 📅 Sessão: Prompt de GenAI e Pinagem de Dependências (10 de Junho de 2026)
+
+### 1. Pinagem de Dependências Estáveis
+*   **Ação**: Fixamos todas as bibliotecas no `requirements.txt` com suas respectivas versões estáveis (ex: `faster-whisper==1.1.1`, `torch==2.3.1`, `mem0ai==0.1.101`, `fastapi==0.115.12`, etc.) para garantir a estabilidade do ambiente e evitar quebras de pacotes em novas instalações.
+
+### 2. Integração do Roteiro Avançado de GenAI System Design
+*   **Ação**: Atualizamos o prompt em `prompts/interviewer_prompt.txt` com um roteiro e rubrica especializados em arquiteturas de IA Generativa, RAG, gateways de LLM e sistemas agênticos.
+*   **Fluxo do Entrevistador**:
+    1.  **Etapa 1 (Abertura)**: Pergunta o nível de dificuldade (mid-level, senior, mixed) e o formato (amplo ou incidentes).
+    2.  **Etapa 2 (Definição)**: Escolha do problema de design (ex: assistente empresarial, copiloto de suporte, gateway multi-model).
+    3.  **Etapa 3 (Arquitetura de Alto Nível)**: Estrutura de dados, fluxos de orquestração e RAG.
+    4.  **Etapa 4 (Deep Dive)**: Investigação de latência, controle de custos, caching de prompt e segurança contra injeção de prompt.
+    5.  **Etapa 5 (Incidentes)**: Rodada prática com incidentes reais de produção (latência de provedor, loops de agentes, vazamento de PII).
+    6.  **Etapa 6 (Feedback)**: Feedback brutalmente honesto seguindo uma rubrica clara (Below bar, Borderline, At bar, Strong).
+
+---
+
 ## 📌 Ponto de Parada Atual (Onde Paramos)
 
 - **Canais**: Julius é agora **100% headless e nativo do WhatsApp**.

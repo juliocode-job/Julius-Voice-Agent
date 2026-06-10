@@ -1,6 +1,6 @@
 # 🔮 Julius Voice Agent — WhatsApp System Design Interviewer
 
-The **Julius Voice Agent** is an intelligent, voice-to-text conversational mock system design interviewer. Operating as a headless, modular stack, it processes user voice messages (in English) sent via WhatsApp, transcribes them using local Whisper STT, leverages long-term semantic memory (Mem0/ChromaDB), and runs a cognitive LangGraph agent powered by ChatGroq to deliver text-based follow-up questions and feedback.
+The **Julius Voice Agent** is an intelligent, voice-to-text conversational mock system design interviewer optimized for **Generative AI, AI Systems, LLM Platform, and Agentic Systems engineering roles**. Operating as a headless, modular stack, it processes user voice messages (in English) sent via WhatsApp, transcribes them using local Whisper STT, leverages long-term semantic memory (Mem0/ChromaDB), and runs a cognitive LangGraph agent powered by ChatGroq to deliver text-based follow-up questions and feedback.
 
 Developer: **Júlio Emanoel**  
 Agent Language: **English (en)**
