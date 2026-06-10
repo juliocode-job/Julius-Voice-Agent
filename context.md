@@ -5,127 +5,87 @@ Este arquivo serve como memória compartilhada das sessões de desenvolvimento d
 ---
 
 ## 🔮 Visão Geral do Projeto
-Agente de voz local, offline e de custo zero para português brasileiro (pt-BR).
-- **VAD**: Silero VAD (3s de silêncio para disparar).
-- **STT**: faster-whisper (`base` model, `int8` CPU).
+Simulador de entrevista de System Design por mensagens de áudio (Audio-to-Text), 100% integrado ao WhatsApp.
+- **STT**: faster-whisper (`small` model, `int8` CPU).
 - **Memória**: Mem0 OSS + ChromaDB local com embeddings `nomic-embed-text`.
 - **Raciocínio cognitivo**: LangGraph + Groq Cloud `llama-3.3-70b-versatile` (com fallback local para Ollama `llama3.2:3b`).
-- **TTS**: Kokoro ONNX com fallback automático de subprocesso para Piper.
+- **Canal de Comunicação**: WhatsApp Cloud API (asynchronous voice-to-text integration).
+- **Ferramentas**: Cenários de System Design (`get_system_design_scenario`), salvamento de avaliações (`save_evaluation`), tempo local (`get_time`) e pesquisa web (`search_web`).
 
 ---
 
 ## 📅 Sessão: Refatoração Modular (03 de Junho de 2026)
 
 ### 1. Reestruturação para Monolito Modular
-Migramos o repositório do padrão de arquivos planos na raiz para um formato de **Monolito Modular** limpo e legível:
-- Pacote principal `julius/`:
-  - `core/config.py`: Variáveis e constantes de caminhos globais (`data/`) e especificações de modelos locais do Ollama.
-  - `vad/detector.py`: Detecção de fala Silero VAD.
-  - `stt/transcriber.py`: Transcrição de áudio com `faster-whisper`.
-  - `memory/manager.py`: Consolidação e consulta de fatos via `Mem0`.
-  - `tts/player.py`: Geração de áudio híbrida (Kokoro/Piper).
-  - `agent/graph.py`: Grafo do diálogo executado com LangGraph.
-  - `agent/tools/`: Pacote com as ferramentas de busca, tempo, lembrete e hora.
+Migramos o repositório do padrão de arquivos planos na raiz para um formato de **Monolito Modular** limpo e legível.
 
 ### 2. Suite de Testes do Repositório (`tests/`)
-Criamos uma pasta de testes oficial no repositório utilizando a biblioteca padrão `unittest` do Python para validar cada subsistema separadamente (`tests/test_vad.py`, `tests/test_stt.py`, etc.).
+Criamos uma pasta de testes oficial no repositório utilizando a biblioteca padrão `unittest` do Python para validar cada subsistema separadamente.
 
 ---
 
-## 📅 Sessão Atual: Otimização de Latência e Estabilidade (04 de Junho de 2026)
+## 📅 Sessão: Otimização de Latência e Estabilidade (04 de Junho de 2026)
 
 Nesta sessão, focamos em migrar o raciocínio cognitivo para a nuvem de ultra-baixa latência do **Groq Cloud**, resolvendo loops de recursão e erros de validação da API ao invocar ferramentas.
-
-### 1. Correção dos Loops de Recursão no LangGraph
-*   **Problema**: O limite padrão de recursão do LangGraph era alcançado (limite 5 ou 10) porque o grafo entrava em loops infinitos, tentando chamar a ferramenta repetidas vezes após ela retornar um resultado.
-*   **Resolução**: Refatoramos o nó `call_model` em `julius/agent/graph.py`. Adicionamos uma validação dinâmica da última mensagem do histórico (`last_msg`). Se o último evento for do tipo `ToolMessage`, o grafo desativa a vinculação de ferramentas e invoca o LLM base para sintetizar a resposta final de forma determinística, encerrando o grafo.
-
-### 2. Separação de Prompts em Duas Etapas (Garantia de Foco)
-*   **Problema**: O modelo de síntese final ficava confuso com regras de uso de ferramentas no prompt do sistema principal, e mesmo em passagens sem ferramentas associadas, ele tentava alucinar que "iria pesquisar" ou respondia evasivamente ("Qual é a sua pergunta?").
-*   **Resolução**: Separamos a lógica de prompting em duas instruções claras:
-    1.  **Prompt de Roteamento/Uso de Ferramentas**: Usado na primeira chamada com ferramentas ativas para decidir a execução (Weather, Time, Search, Reminder).
-    2.  **Prompt de Síntese (`system_prompt_synthesis`)**: Usado na segunda chamada para formular o texto final. Remove todas as diretrizes de ferramentas e foca unicamente em ler os dados retornados no histórico recente e responder ao usuário diretamente de forma curta, amigável e conversacional.
-
-### 3. Conversão de Papéis (Role-Conversion) no Histórico de Mensagens
-*   **Problema**: Durante a fase de síntese final, a API do Groq e o modelo Llama tendiam a **ocultar ou ignorar** mensagens com o papel (`role`) `tool` por não estarem com ferramentas ativas no payload de envio da API. Isso fazia com que o modelo "esquecesse" o dado recém-calculado pela ferramenta (ex: a hora atual ou a temperatura).
-*   **Resolução**: Criamos uma função de mapeamento de mensagens antes do envio ao modelo na fase de síntese:
-    - Qualquer `AIMessage` contendo `tool_calls` é traduzida em uma resposta simples do assistente: `[Executando: nome_ferramenta(argumentos)]`.
-    - Qualquer `ToolMessage` é traduzida em uma entrada de usuário: `[Resultado da ferramenta: conteúdo]`.
-    - Isso garante que o histórico use exclusivamente os papéis padrão (`user` e `assistant`), que são 100% suportados e atendidos por qualquer template de chat de LLM.
-
-### 4. Transição para `llama-3.3-70b-versatile` (Estabilidade de Ferramentas)
-*   **Problema**: O modelo menor `llama-3.1-8b-instant` gerava as chamadas de ferramentas de forma inconsistente, emitindo tags XML parciais. A API do Groq rejeita essa sintaxe malformatada retornando erro `400`.
-*   **Resolução**: Atualizamos a constante `GROQ_MODEL` para utilizar o **`llama-3.3-70b-versatile`**.
-
-### 5. Limpeza de Logs, Warnings e Remoção de Streaming de Console
-*   **Problema**: O console ficava poluído com avisos de depreciação (como `opentelemetry` e `torch.jit.load`), avisos de spaCy inexistente da biblioteca `mem0` e prints excessivos de debug interno (`[Agent Debug]`), além de streaming de tokens picado que dificultava a leitura da conversa.
-*   **Resolução**:
-    - Silenciamos `DeprecationWarning` e `UserWarning` no bootstrap do projeto (`julius/__init__.py` e `main.py`).
-    - Configuramos o logger do `mem0` para apenas exibir erros (`logging.ERROR`).
-    - Envolvemos inicializações críticas (como o Silero VAD e o Mem0) em blocos `warnings.catch_warnings()` locais para interceptar e esconder warnings de dependências.
-    - Removemos todos os prints de depuração internos do agente (`[Agent Debug]`) e desativamos o streaming de console (usando chamada direta `llm.invoke()`), mas **mantivemos** os painéis e logs visuais sobre a consulta e recuperação de memórias de longo prazo (Mem0) para dar clareza de contexto ao usuário.
 
 ---
 
 ## 📅 Sessão: Segurança e Documentação da Arquitetura (08 de Junho de 2026)
 
 ### 1. Migração de Configurações para Variáveis de Ambiente (`.env`)
-*   **Problema**: Credenciais sensíveis (como a chave `GROQ_API_KEY`) estavam hardcoded no arquivo de configuração `julius/core/config.py`.
-*   **Resolução**:
-    - Adicionamos a biblioteca `python-dotenv` ao projeto.
-    - Criamos o arquivo local `.env` para armazenar de forma segura as variáveis (`GROQ_API_KEY`, `USE_GROQ`, `GROQ_MODEL`, e as URLs/modelos do Ollama).
-    - Criamos o template `.env.example` sem as credenciais sensíveis para guiar novos setups do projeto.
-    - Refatoramos `julius/core/config.py` para carregar o arquivo `.env` via `load_dotenv` e consultar os parâmetros usando `os.getenv`.
+Adicionamos a biblioteca `python-dotenv` ao projeto e removemos credenciais sensíveis codificadas diretamente.
 
 ### 2. Controle de Versão e Exclusões do Git
-*   **Problema**: Havia risco de commits acidentais de arquivos temporários, bancos de dados locais, modelos de IA gigantescos e credenciais de ambiente.
-*   **Resolução**:
-    - Criamos o arquivo `.gitignore` excluindo explicitamente a pasta `data/`, ambientes virtuais `venv/`, arquivos `.env`, além de pastas geradas por IDEs (`.vscode`, `.idea`) e cache do Python (`__pycache__`).
-
-### 3. Documentação Completa da Arquitetura do Sistema
-*   **Problema**: Faltava um guia descritivo e visual detalhando como a pilha local-híbrida de áudio e os grafos cognitivos interagem.
-*   **Resolução**:
-    - Escrevemos o arquivo `ARCHITECTURE.md` em inglês contendo:
-        1. A jornada detalhada do usuário em formato de diagrama de sequência Mermaid.
-        2. O fluxo de dados ponta a ponta (microfone -> VAD -> STT -> Memória -> LangGraph -> Tools -> TTS -> Alto-falante) em diagrama de fluxo Mermaid.
-        3. A lista de recursos e a documentação das variáveis de configuração.
+Criamos o arquivo `.gitignore` excluindo pastas geradas localmente (`data/`, `venv/`, `.env`).
 
 ---
 
 ## 📅 Sessão: Integração com WhatsApp e Pivô para Inglês (09 de Junho de 2026)
 
 ### 1. Canal de Comunicação do WhatsApp (FastAPI + Webhook)
-*   **Problema**: Integrar o agente de voz Julius de forma assíncrona ao WhatsApp para simular entrevistas de System Design.
-*   **Resolução**:
-    - Criamos a estrutura de pacotes `julius/whatsapp/` e implementamos o adaptador `adapter.py` para coordenar o download de mídia (mensagens de voz .ogg do Meta API), transcrição local em thread pools e execução assíncrona do grafo LangGraph.
-    - Criamos o endpoint de Webhook FastAPI `whatsapp_webhook.py` com rotas para validação do Meta (GET) e processamento assíncrono seguro (POST) protegido por whitelist de número de telefone (`MY_WHATSAPP_NUMBER`).
-    - Para segurança e performance, envolvemos todas as chamadas síncronas/bloqueantes pesadas de STT e do LangGraph em executors usando `asyncio.to_thread`.
+Criamos a estrutura de pacotes `julius/whatsapp/` e implementamos o adaptador `adapter.py` para coordenar o download de mensagens de voz e transcrição local, com um servidor FastAPI webhook exposto por túnel seguro.
 
 ### 2. Pivô Completo do Idioma para Inglês (English Language Pivot)
-*   **Problema**: Tanto os áudios recebidos pelo WhatsApp/Microfone quanto as respostas do Julius precisavam ser exclusivamente em inglês para treinar entrevistas.
+Atualizamos o idioma de transcrição e prompts de raciocínio no LangGraph para inglês, permitindo a prática fluida de simulação de entrevistas de design em inglês.
+
+---
+
+## 📅 Sessão: Transição para 100% WhatsApp-Native e Ferramentas de System Design (10 de Junho de 2026)
+
+### 1. Remoção de Módulos Locais Obsoletos
+*   **Problema**: O projeto possuía redundância de canais (CLI de áudio contínuo e WhatsApp webhook), e bibliotecas pesadas de áudio local (`sounddevice`, `silero-vad`, `kokoro-onnx`) causavam dependências complexas de drivers e modelos.
 *   **Resolução**:
-    - Atualizamos o idioma forçado de transcrição do Whisper de `"pt"` para `"en"` no `transcriber.py`.
-    - Traduzimos todos os prompts de fallback (Roteamento e Síntese de Ferramentas) no `graph.py` para inglês e removemos quaisquer referências a "português brasileiro".
-    - Atualizamos o player de TTS (`player.py`) para baixar o modelo de áudio do Piper em inglês (`en_US-lessac-medium.onnx`) e configuramos o Kokoro com a voz americana padrão (`af_sarah` e `lang="en-us"`).
-    - Traduzimos a interface do terminal CLI de `main.py` e os retornos da ferramenta `get_time` em `current_time.py` para inglês de ponta a ponta.
+    - Deletamos `main.py` (CLI), `julius/vad/` (Silero VAD) e `julius/tts/` (Kokoro/Piper TTS).
+    - Removemos as dependências desnecessárias do arquivo `requirements.txt`.
+    - Excluímos as ferramentas genéricas antigas (`weather.py` e `reminder.py`).
+
+### 2. Criação de Ferramentas Especializadas em System Design
+*   **Problema**: O agente necessitava de ferramentas específicas para conduzir e persistir o processo de entrevistas de design.
+*   **Resolução**:
+    - Implementamos `julius/agent/tools/system_design.py` contendo:
+      1. `get_system_design_scenario(topic)`: Carrega cenários pré-definidos (Rate Limiter, Chat Service, Ride Hailing, TinyURL, etc.).
+      2. `save_evaluation(feedback_notes)`: Salva notas detalhadas sobre o desempenho do candidato em `data/evaluations.txt`.
+    - Refatoramos e registramos essas novas ferramentas no grafo do LangGraph (`graph.py`).
+
+### 3. Suite de Testes em Inglês
+*   **Problema**: Os testes antigos continham asserções em português e referências a pacotes de VAD e TTS removidos.
+*   **Resolução**:
+    - Deletamos `tests/test_vad.py` e `tests/test_tts.py`.
+    - Reescrevemos todos os testes restantes (`test_agent.py`, `test_memory.py`, `test_stt.py`, `test_tools.py`) em inglês.
+    - Todos os testes passaram com sucesso no console do Windows.
 
 ---
 
 ## 📌 Ponto de Parada Atual (Onde Paramos)
 
-- **Canais**: Julius agora suporta dupla entrada (Loop local via microfone em `main.py` e servidor de webhook assíncrono via `whatsapp_webhook.py`).
-- **Idioma**: Todas as operações são 100% nativas em inglês.
-- **Integração WhatsApp**: Pronto para teste em ambiente de produção (Meta Developer Portal).
-- **Testes Automatizados**: A suite de testes no scratch `test_whatsapp_integration.py` e unitária de `test_agent.py` rodam e passam com sucesso.
-
-### Como Rodar no Próximo Chat:
-1. Para o loop de voz CLI local:
-   ```powershell
-   .\venv\Scripts\activate
-   python main.py
-   ```
-2. Para o canal do WhatsApp Webhook:
-   ```powershell
-   .\venv\Scripts\activate
-   uvicorn whatsapp_webhook:app --reload --port 8000
-   ```
+- **Canais**: Julius é agora **100% headless e nativo do WhatsApp**.
+- **Idioma**: Todas as operações de transcrição, diálogo e logs são 100% nativas em inglês.
+- **Como Executar o Servidor de Webhook**:
+  ```powershell
+  .\venv\Scripts\activate
+  uvicorn whatsapp_webhook:app --reload --port 8000
+  ```
+- **Túnel Webhook (ngrok)**:
+  ```bash
+  ngrok http 8000
+  ```
