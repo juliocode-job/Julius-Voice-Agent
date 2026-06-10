@@ -1,6 +1,6 @@
-# 🔮 Julius Voice Agent — Hybrid Edge-Cloud Stack
+# 🔮 Julius Voice Agent — WhatsApp System Design Interviewer
 
-The **Julius Voice Agent** is an intelligent, conversational voice assistant designed in English. Operating as a hybrid edge-cloud modular monolith, it integrates state-of-the-art open-source AI models for voice activity detection, speech-to-text transcription, cognitive state orchestration, persistent long-term memory recall, neural speech synthesis, and an asynchronous WhatsApp interface for mock system design interviews.
+The **Julius Voice Agent** is an intelligent, voice-to-text conversational mock system design interviewer. Operating as a headless, modular stack, it processes user voice messages (in English) sent via WhatsApp, transcribes them using local Whisper STT, leverages long-term semantic memory (Mem0/ChromaDB), and runs a cognitive LangGraph agent powered by ChatGroq to deliver text-based follow-up questions and feedback.
 
 Developer: **Júlio Emanoel**  
 Agent Language: **English (en)**
@@ -27,7 +27,6 @@ The codebase follows a **Modular Monolith** structure, separating responsibiliti
 
 ```
 Julius Voice Agent/
-├── main.py                    # Entry point (continuous audio loop & Rich CLI)
 ├── whatsapp_webhook.py        # FastAPI server webhook for WhatsApp Cloud API channel
 ├── requirements.txt           # Python dependency manifests
 ├── .gitignore                 # Version control exclusions (ignores .env, data, venv)
@@ -39,18 +38,12 @@ Julius Voice Agent/
 │   ├── core/
 │   │   ├── __init__.py
 │   │   └── config.py          # Environment settings loader via python-dotenv
-│   ├── vad/
-│   │   ├── __init__.py
-│   │   └── detector.py        # Voice Activity Detection (Silero VAD wrapper)
 │   ├── stt/
 │   │   ├── __init__.py
 │   │   └── transcriber.py     # Local Speech-to-Text transcriber (faster-whisper)
 │   ├── memory/
 │   │   ├── __init__.py
 │   │   └── manager.py         # Long-term semantic memory manager (Mem0 + ChromaDB)
-│   ├── tts/
-│   │   ├── __init__.py
-│   │   └── player.py          # Hybrid neural speech synthesizer (Kokoro/Piper)
 │   ├── whatsapp/
 │   │   ├── __init__.py        # WhatsApp sub-package init
 │   │   └── adapter.py         # Media downloader, STT transcriber, and agent router
@@ -60,22 +53,17 @@ Julius Voice Agent/
 │       └── tools/             # Bound agent tools
 │           ├── __init__.py
 │           ├── search.py      # DuckDuckGo web search API
-│           ├── weather.py     # Open-Meteo weather API
-│           ├── reminder.py    # SQLite-backed reminder scheduler
-│           └── current_time.py# Local system datetime query tool
+│           ├── current_time.py# Local system datetime query tool
+│           └── system_design.py# Scenario loader and evaluation notes saver
 ├── tests/                     # Unit testing suite
 │   ├── __init__.py
-│   ├── test_vad.py
 │   ├── test_stt.py
 │   ├── test_memory.py
-│   ├── test_tts.py
 │   ├── test_agent.py
 │   └── test_tools.py
 └── data/                      # Persistence directory (auto-generated)
     ├── memory.db              # SQLite storage for LangGraph thread checkpointers
-    ├── reminders.db           # SQLite database for user reminders
-    ├── chroma_db/             # Local Vector database for Mem0 embeddings
-    └── tts_models/            # Downloaded Kokoro/Piper neural model assets
+    └── chroma_db/             # Local Vector database for Mem0 embeddings
 ```
 
 ---
