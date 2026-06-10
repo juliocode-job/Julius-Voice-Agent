@@ -107,9 +107,6 @@ async def inbound_message(request: Request):
 
 
 async def send_text(to: str, text: str):
-    """
-    Sends a plain text message via WhatsApp Cloud API.
-    """
     async with httpx.AsyncClient(timeout=15.0) as client:
         url = f"https://graph.facebook.com/v19.0/{WHATSAPP_PHONE_ID}/messages"
         headers = {
@@ -125,5 +122,9 @@ async def send_text(to: str, text: str):
         
         logger.info(f"[Send] Sending response to {to}...")
         resp = await client.post(url, headers=headers, json=payload)
-        resp.raise_for_status()
+        
+        if resp.status_code != 200:
+            logger.error(f"[Send] API error {resp.status_code}: {resp.text}")
+            resp.raise_for_status()
+        
         logger.info(f"[Send] Message delivered successfully to {to}")
